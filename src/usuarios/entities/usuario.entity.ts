@@ -1,9 +1,22 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
-@Entity()
+export enum Rol {
+  ADMIN = 'admin',
+  ALMACEN = 'almacen',
+  SOLICITADOR = 'solicitador',
+  APROBADOR = 'aprobador',
+  AUDITOR = 'auditor',
+}
+@Entity('usuarios')
 export class Usuario {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column('text')
   name: string;
@@ -13,16 +26,24 @@ export class Usuario {
   })
   username: string;
 
-  @Column('text')
+  @Column({ select: false })
   password: string;
 
-  @Column('int', {
+  @Column({
+    type: 'enum',
+    enum: Rol,
     nullable: false,
   })
-  rol: number;
+  rol: Rol;
 
-  @Column('int', {
-    default: 0,
+  @Column({
+    default: true,
   })
-  state: number;
+  state: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }
