@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Usuario } from './entities/usuario.entity';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { PaginationDto } from 'src/common/dtos/pagination.dto';
 
 @Injectable()
 export class UsuariosService {
@@ -38,8 +39,11 @@ export class UsuariosService {
     return await this.usuarioRepository.save(usuario);
   }
 
-  async findAll(): Promise<Usuario[]> {
+  async findAll(PaginationDto: PaginationDto): Promise<Usuario[]> {
+    const { limit = 10, offset = 0 } = PaginationDto;
     return await this.usuarioRepository.find({
+      take: limit,
+      skip: offset,
       order: { id: 'ASC' },
     });
   }
