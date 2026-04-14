@@ -26,7 +26,7 @@ export class UsuariosService {
     });
 
     if (exists) {
-      throw new ConflictException('El usuario ya está en uso');
+      throw new ConflictException('El usuario ya existe');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -60,8 +60,28 @@ export class UsuariosService {
     return usuario;
   }
 
-  update(id: number, updateUsuarioDto: UpdateUsuarioDto) {
-    return `This action updates a #${id} usuario`;
+  async update(
+    id: number,
+    updateUsuarioDto: UpdateUsuarioDto,
+  ): Promise<Usuario> {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id: id },
+    });
+
+    if (!usuario) {
+      throw new NotFoundException(`Usuario con id ${id} no encontrado`);
+    }
+
+    // Si viene password nueva, la hasheamos
+    if (updateUsuarioDto.password) {
+      updateUsuarioDto.password = await bcrypt.hash(
+        updateUsuarioDto.password,
+        10,
+      );
+    }
+
+    Object.assign(usuario, updateUsuarioDto);
+    return this.usuarioRepository.save(usuario);
   }
 
   async remove(id: number): Promise<Usuario> {
