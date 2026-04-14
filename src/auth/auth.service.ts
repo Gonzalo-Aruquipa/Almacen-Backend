@@ -1,26 +1,139 @@
-import { Injectable } from '@nestjs/common';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Usuario } from './entities/usuario.entity';
+import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import { PaginationDto } from 'src/common/dtos/pagination.dto';
+import { LoginUsuarioDto } from './dto/login-usuario.dto';
 
 @Injectable()
-export class AuthService {
-  create(createAuthDto: CreateAuthDto) {
-    return 'This action adds a new auth';
+export class UsuariosService {
+  constructor(
+    @InjectRepository(Usuario)
+    private readonly usuarioRepository: Repository<Usuario>,
+  ) {}
+
+  async login(LoginUsuarioDto: LoginUsuarioDto) {
+    const { username, password } = LoginUsuarioDto;
+
+    // Buscar usuario
+    const usuario = await this.usuarioRepository.findOne({
+      where: { username },
+      select: ['id', 'username', 'password', 'rol', 'state'],
+    });
+
+    if (!usuario) {
+      throw new UnauthorizedException('Usuario incorrecto');
+    }
+
+    const passwordValido = await bcrypt.compare(password, usuario.password);
+    console.log(passwordValido);
+    if (!passwordValido) {
+      throw new UnauthorizedException('Contraseña Incorrecta');
+    }
+
+    // // Verificar estado
+    // if (usuario.state == false) {
+    //   throw new UnauthorizedException('Usuario inactivo');
+    // }
+
+    // Generar JWT
+    // const payload = {
+    //   sub: usuario.id,
+    //   username: usuario.username,
+    //   rol: usuario.rol,
+    // };
+
+    // return {
+    //   // access_token: this.jwtService.sign(payload),
+    //   usuario: {
+    //     id: usuario.id,
+    //     name: usuario.name,
+    //     username: usuario.username,
+    //     rol: usuario.rol,
+    //   },
+    // };
+    return usuario;
   }
 
-  findAll() {
-    return `This action returns all auth`;
+  async create(createUsuarioDto: CreateUsuarioDto): Promise<Usuario> {
+    const { password, ...rest } = createUsuarioDto;
+
+    const exists = await this.usuarioRepository.findOne({
+      where: { username: rest.username },
+    });
+
+    if (exists) {
+      throw new ConflictException('El usuario ya existe');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const usuario = this.usuarioRepository.create({
+      ...rest,
+      password: hashedPassword,
+    });
+
+    return await this.usuarioRepository.save(usuario);
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} auth`;
+  async findAll(PaginationDto: PaginationDto): Promise<Usuario[]> {
+    const { limit = 10, offset = 0 } = PaginationDto;
+    return await this.usuarioRepository.find({
+      take: limit,
+      skip: offset,
+      order: { id: 'ASC' },
+    });
   }
 
-  update(id: number, updateAuthDto: UpdateAuthDto) {
-    return `This action updates a #${id} auth`;
+  async findOne(id: number): Promise<Usuario> {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id: id },
+    });
+
+    if (!usuario) {
+      throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
+    }
+
+    return usuario;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} auth`;
+  async update(
+    id: number,
+    updateUsuarioDto: UpdateUsuarioDto,
+  ): Promise<Usuario> {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id: id },
+    });
+
+    if (!usuario) {
+      throw new NotFoundException(`Usuario con id ${id} no encontrado`);
+    }
+
+    // Si viene password nueva, la hasheamos
+    if (updateUsuarioDto.password) {
+      updateUsuarioDto.password = await bcrypt.hash(
+        updateUsuarioDto.password,
+        10,
+      );
+    }
+
+    Object.assign(usuario, updateUsuarioDto);
+    return this.usuarioRepository.save(usuario);
+  }
+
+  async remove(id: number): Promise<Usuario> {
+    const usuario = await this.usuarioRepository.findOne({ where: { id: id } });
+    if (!usuario) {
+      throw new NotFoundException(`Usuario con ID ${id} no existe`);
+    }
+    return await this.usuarioRepository.remove(usuario);
   }
 }
